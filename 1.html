@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <title>SheetChat · Mobile Messenger</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        :root {
+            --wa-primary: #075e54;
+            --wa-primary-dark: #054a3f;
+            --wa-secondary: #25D366;
+            --wa-bg: #efeae2;
+            --wa-bubble-sent: #dcf8c5;
+            --wa-bubble-received: #ffffff;
+            --wa-text-dark: #111b21;
+            --wa-text-light: #667781;
+            --wa-border: #e9edef;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+            --transition: all 0.2s ease;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: var(--wa-bg);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Header - WhatsApp style */
+        .app-header {
+            background: var(--wa-primary);
+            color: white;
+            padding: 14px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: var(--shadow-sm);
+            backdrop-filter: blur(0px);
+            z-index: 2;
+        }
+
+        .app-header h1 {
+            font-size: 1.35rem;
+            font-weight: 600;
+            letter-spacing: -0.2px;
+            flex: 1;
+        }
+
+        .status-badge {
+            background: rgba(255,255,255,0.2);
+            border-radius: 30px;
+            padding: 5px 12px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            backdrop-filter: blur(2px);
+        }
+
+        /* Setup card (modern overlay style) */
+        .setup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.75);
+            backdrop-filter: blur(8px);
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            transition: opacity 0.25s ease;
+        }
+
+        .setup-card {
+            background: white;
+            border-radius: 32px;
+            padding: 28px 22px;
+            max-width: 360px;
+            width: 100%;
+            box-shadow: var(--shadow-md);
+            animation: fadeUp 0.3s ease;
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .setup-card h2 {
+            font-size: 1.6rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--wa-primary);
+        }
+
+        .setup-card p {
+            color: var(--wa-text-light);
+            font-size: 0.85rem;
+            margin-bottom: 24px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+            color: var(--wa-text-light);
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 14px 16px;
+            font-size: 1rem;
+            border: 1.5px solid var(--wa-border);
+            border-radius: 28px;
+            outline: none;
+            background: #fefefe;
+            transition: var(--transition);
+        }
+
+        .input-group input:focus {
+            border-color: var(--wa-secondary);
+            box-shadow: 0 0 0 3px rgba(37,211,102,0.2);
+        }
+
+        .connect-btn {
+            background: var(--wa-primary);
+            color: white;
+            border: none;
+            width: 100%;
+            padding: 14px;
+            border-radius: 40px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: var(--transition);
+            margin-top: 10px;
+        }
+
+        .connect-btn:active {
+            transform: scale(0.97);
+            background: var(--wa-primary-dark);
+        }
+
+        /* Chat area container */
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 12px;
+            display: flex;
+            flex-direction: column;
+            scroll-behavior: smooth;
+            gap: 4px;
+        }
+
+        /* custom scroll */
+        .chat-messages::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .chat-messages::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+        }
+
+        /* Message bubbles */
+        .message {
+            max-width: 85%;
+            padding: 10px 14px;
+            margin-bottom: 6px;
+            border-radius: 20px;
+            font-size: 0.95rem;
+            line-height: 1.4;
+            position: relative;
+            word-wrap: break-word;
+            animation: messagePop 0.2s ease;
+        }
+
+        @keyframes messagePop {
+            from { opacity: 0; transform: translateY(8px);}
+            to { opacity: 1; transform: translateY(0);}
+        }
+
+        .message.sent {
+            align-self: flex-end;
+            background: var(--wa-bubble-sent);
+            border-bottom-right-radius: 4px;
+            color: var(--wa-text-dark);
+        }
+
+        .message.received {
+            align-self: flex-start;
+            background: var(--wa-bubble-received);
+            border-bottom-left-radius: 4px;
+            box-shadow: var(--shadow-sm);
+            color: var(--wa-text-dark);
+        }
+
+        /* Timestamp style (optional small meta) */
+        .message .msg-text {
+            display: block;
+        }
+
+        /* Input footer */
+        .input-footer {
+            background: white;
+            padding: 12px 16px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            border-top: 1px solid var(--wa-border);
+            backdrop-filter: blur(10px);
+            background: rgba(255,255,255,0.96);
+        }
+
+        .input-footer input {
+            flex: 1;
+            padding: 12px 18px;
+            border-radius: 30px;
+            border: 1px solid var(--wa-border);
+            background: #f8f9fa;
+            font-size: 0.95rem;
+            outline: none;
+            transition: var(--transition);
+        }
+
+        .input-footer input:focus {
+            border-color: var(--wa-secondary);
+            background: white;
+        }
+
+        .input-footer button {
+            background: var(--wa-primary);
+            border: none;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .input-footer button:active {
+            transform: scale(0.92);
+            background: var(--wa-primary-dark);
+        }
+
+        .input-footer button svg {
+            width: 22px;
+            height: 22px;
+            fill: white;
+        }
+
+        /* Empty state */
+        .empty-chat {
+            text-align: center;
+            margin-top: 40px;
+            color: var(--wa-text-light);
+            font-size: 0.9rem;
+            padding: 20px;
+        }
+
+        /* connection / offline indicator */
+        .connection-tag {
+            font-size: 0.7rem;
+            background: rgba(0,0,0,0.6);
+            border-radius: 20px;
+            padding: 3px 10px;
+            color: white;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* Mobile optimizations */
+        @media (max-width: 480px) {
+            .message {
+                max-width: 88%;
+                font-size: 0.9rem;
+                padding: 9px 12px;
+            }
+            .input-footer {
+                padding: 8px 12px;
+            }
+            .app-header {
+                padding: 12px 16px;
+            }
+            .setup-card {
+                padding: 24px 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-header">
+    <h1>📱 SheetChat</h1>
+    <div id="connectionStatus" class="status-badge">⚡ offline</div>
+</div>
+
+<div class="chat-container">
+    <div id="chatMessages" class="chat-messages">
+        <div class="empty-chat">✨ Connect to start messaging</div>
+    </div>
+
+    <div class="input-footer" id="inputFooter" style="display: none;">
+        <input type="text" id="messageInput" placeholder="Type a message..." autocomplete="off" enterkeyhint="send">
+        <button id="sendButton" aria-label="Send message">
+            <svg viewBox="0 0 24 24" width="22" height="22">
+                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+            </svg>
+        </button>
+    </div>
+</div>
+
+<!-- Setup Modal / overlay -->
+<div id="setupOverlay" class="setup-overlay">
+    <div class="setup-card">
+        <h2>✨ Connect</h2>
+        <p>Enter phone numbers to start secure sheet messaging</p>
+        <div class="input-group">
+            <label>📞 YOUR PHONE</label>
+            <input type="tel" id="myNumber" placeholder="e.g., 919876543210" autocomplete="off">
+        </div>
+        <div class="input-group">
+            <label>👤 FRIEND'S PHONE</label>
+            <input type="tel" id="friendNumber" placeholder="e.g., 919876543211" autocomplete="off">
+        </div>
+        <button class="connect-btn" id="connectBtn">Start Chat →</button>
+        <p style="font-size: 11px; text-align: center; margin-top: 16px; color: #aaa;">Messages stored in Google Sheet</p>
+    </div>
+</div>
+
+<script>
+    // ======================== CONFIGURATION ==========================
+    // ⚠️  REPLACE WITH YOUR ACTUAL APPS SCRIPT WEB APP URL (EXEC)
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzZyziwpIPaW8GCKZRvDcYOLXcmYTAtRDqh4Uq1jvMMe2TkuLHGD98QMJVPvS_g1m_j/exec"; 
+    
+    // Chat state
+    let myPhone = "";
+    let friendPhone = "";
+    let pollingInterval = null;
+    let lastMessageCount = 0;
+    let isConnected = false;
+
+    // DOM elements
+    const setupOverlay = document.getElementById('setupOverlay');
+    const chatMessagesDiv = document.getElementById('chatMessages');
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendButton');
+    const inputFooter = document.getElementById('inputFooter');
+    const connectionStatusSpan = document.getElementById('connectionStatus');
+    const myNumberInput = document.getElementById('myNumber');
+    const friendNumberInput = document.getElementById('friendNumber');
+    const connectBtnEl = document.getElementById('connectBtn');
+
+    // Helper: format phone (basic trim)
+    function sanitizePhone(num) {
+        return String(num).trim().replace(/\s+/g, '');
+    }
+
+    // Update UI connection status badge
+    function updateConnectionUI(connected, message = "") {
+        if (connected) {
+            connectionStatusSpan.innerHTML = `✅ ${friendPhone ? `Chat with ${friendPhone}` : 'Connected'}`;
+            connectionStatusSpan.style.background = "rgba(37, 211, 102, 0.85)";
+        } else {
+            connectionStatusSpan.innerHTML = message || "⚡ offline";
+            connectionStatusSpan.style.background = "rgba(0,0,0,0.5)";
+        }
+    }
+
+    // Render messages from the fetched array
+    function renderMessages(messagesArray) {
+        if (!chatMessagesDiv) return;
+        
+        if (!messagesArray || messagesArray.length === 0) {
+            chatMessagesDiv.innerHTML = `<div class="empty-chat">💬 No messages yet. Say hello!</div>`;
+            return;
+        }
+        
+        const fragment = document.createDocumentFragment();
+        messagesArray.forEach(msg => {
+            const msgText = msg.text || msg.message || "";
+            const senderRaw = msg.sender || msg.from || "";
+            const isSent = String(senderRaw) === String(myPhone);
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
+            const innerSpan = document.createElement('span');
+            innerSpan.className = 'msg-text';
+            innerSpan.textContent = msgText;
+            messageDiv.appendChild(innerSpan);
+            fragment.appendChild(messageDiv);
+        });
+        
+        chatMessagesDiv.innerHTML = "";
+        chatMessagesDiv.appendChild(fragment);
+        
+        // Auto-scroll to bottom
+        chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+    }
+
+    // Fetch messages from Google Apps Script (POST with JSON)
+    async function fetchMessagesFromSheet() {
+        if (!isConnected || !myPhone || !friendPhone) return;
+        
+        try {
+            const payload = {
+                action: "fetch",
+                myNum: myPhone,
+                friendNum: friendPhone
+            };
+            
+            // Using fetch with proper headers - Apps Script expects POST & JSON
+            const response = await fetch(SCRIPT_URL, {
+                method: "POST",
+                mode: "cors",          // CORS may be enabled, but Apps Script supports it with allow
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(payload)
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
+            const data = await response.json();
+            // data expected to be an array of messages: [{sender, text}, ...]
+            let messages = [];
+            if (Array.isArray(data)) {
+                messages = data;
+            } else if (data && data.messages && Array.isArray(data.messages)) {
+                messages = data.messages;
+            } else if (data && Array.isArray(data.data)) {
+                messages = data.data;
+            } else {
+                // fallback try to convert object values
+                messages = [];
+            }
+            
+            // Update only if length changed (prevents flickering)
+            if (messages.length !== lastMessageCount) {
+                renderMessages(messages);
+                lastMessageCount = messages.length;
+            } else if (lastMessageCount === 0 && messages.length === 0) {
+                // still empty - show empty message exactly once
+                if (chatMessagesDiv.innerHTML.indexOf("empty-chat") === -1 && messages.length === 0) {
+                    chatMessagesDiv.innerHTML = `<div class="empty-chat">💬 No messages yet. Say hello!</div>`;
+                }
+            }
+            
+            updateConnectionUI(true);
+            return messages;
+        } catch (err) {
+            console.warn("Fetch error:", err);
+            updateConnectionUI(false, "⚠️ sync issue");
+            // Still keep UI responsive, but don't clear messages
+            return [];
+        }
+    }
+
+    // Send message to Apps Script
+    async function sendMessage(text) {
+        if (!text || !text.trim()) return false;
+        if (!isConnected || !myPhone || !friendPhone) {
+            alert("Please connect first (valid phone numbers)");
+            return false;
+        }
+        
+        const cleanMsg = text.trim();
+        
+        // Optimistic UI update (add message instantly)
+        const optimisticMsg = {
+            sender: myPhone,
+            text: cleanMsg,
+            timestamp: Date.now()
+        };
+        
+        // temporarily add to view
+        const currentMessages = [];
+        const existingDivs = chatMessagesDiv.querySelectorAll('.message');
+        existingDivs.forEach(div => {
+            const textSpan = div.querySelector('.msg-text');
+            if (textSpan) currentMessages.push({ text: textSpan.textContent });
+        });
+        // show optimistic message in UI
+        const tempMsgDiv = document.createElement('div');
+        tempMsgDiv.className = 'message sent';
+        tempMsgDiv.innerHTML = `<span class="msg-text">${escapeHtml(cleanMsg)}</span>`;
+        chatMessagesDiv.appendChild(tempMsgDiv);
+        chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+        
+        // clear input
+        messageInput.value = "";
+        
+        try {
+            const payload = {
+                action: "send",
+                sender: myPhone,
+                receiver: friendPhone,
+                message: cleanMsg
+            };
+            
+            await fetch(SCRIPT_URL, {
+                method: "POST",
+                mode: "cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            
+            // after successful post, increase lastMessageCount to force refresh on next poll
+            // but we also rely on polling. Force fetch after send for consistency
+            setTimeout(() => {
+                fetchMessagesFromSheet().then(() => {
+                    // ensure lastCount is synced after actual fetch
+                });
+            }, 300);
+            return true;
+        } catch (err) {
+            console.error("Send error:", err);
+            // Remove optimistic message and show error alert
+            if (chatMessagesDiv.lastChild === tempMsgDiv) {
+                chatMessagesDiv.removeChild(tempMsgDiv);
+            }
+            alert("Failed to send. Check connection & Apps Script CORS configuration.");
+            return false;
+        }
+    }
+    
+    // simple escape to avoid injection
+    function escapeHtml(str) {
+        if (!str) return "";
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
+            return c;
+        });
+    }
+
+    // start polling for new messages
+    function startPolling(intervalMs = 3500) {
+        if (pollingInterval) clearInterval(pollingInterval);
+        // immediate fetch
+        fetchMessagesFromSheet();
+        pollingInterval = setInterval(() => {
+            if (isConnected) {
+                fetchMessagesFromSheet();
+            }
+        }, intervalMs);
+    }
+    
+    // Stop polling and clean up
+    function stopPolling() {
+        if (pollingInterval) {
+            clearInterval(pollingInterval);
+            pollingInterval = null;
+        }
+    }
+    
+    // Establish connection and hide overlay
+    function establishConnection() {
+        const myRaw = myNumberInput.value;
+        const friendRaw = friendNumberInput.value;
+        const mySanitized = sanitizePhone(myRaw);
+        const friendSanitized = sanitizePhone(friendRaw);
+        
+        if (!mySanitized || !friendSanitized) {
+            alert("Please enter both phone numbers (international format recommended)");
+            return false;
+        }
+        
+        if (mySanitized === friendSanitized) {
+            alert("My number and friend's number must be different");
+            return false;
+        }
+        
+        myPhone = mySanitized;
+        friendPhone = friendSanitized;
+        
+        // Reset state
+        lastMessageCount = 0;
+        isConnected = true;
+        
+        // Hide setup overlay with smooth transition
+        setupOverlay.style.opacity = "0";
+        setTimeout(() => {
+            setupOverlay.style.display = "none";
+        }, 250);
+        
+        // Show input footer
+        inputFooter.style.display = "flex";
+        
+        // Clear previous messages container
+        chatMessagesDiv.innerHTML = '<div class="empty-chat">⏳ Loading messages...</div>';
+        
+        // Start polling
+        startPolling(3500);
+        updateConnectionUI(true, `Connected to ${friendPhone}`);
+        
+        // Focus on message input after small delay
+        setTimeout(() => {
+            messageInput.focus();
+        }, 200);
+        
+        return true;
+    }
+    
+    // Disconnect and reset (can be triggered if needed)
+    function resetConnection() {
+        stopPolling();
+        isConnected = false;
+        myPhone = "";
+        friendPhone = "";
+        lastMessageCount = 0;
+        inputFooter.style.display = "none";
+        chatMessagesDiv.innerHTML = '<div class="empty-chat">✨ Connect to start messaging</div>';
+        setupOverlay.style.display = "flex";
+        setupOverlay.style.opacity = "1";
+        updateConnectionUI(false, "disconnected");
+        // clear input fields but keep placeholder
+        if (myNumberInput) myNumberInput.value = "";
+        if (friendNumberInput) friendNumberInput.value = "";
+    }
+    
+    // Event listeners
+    connectBtnEl.addEventListener('click', () => {
+        establishConnection();
+    });
+    
+    // Send via button
+    sendBtn.addEventListener('click', () => {
+        if (messageInput.value.trim()) {
+            sendMessage(messageInput.value);
+        }
+    });
+    
+    // Send with enter key (mobile keyboard)
+    messageInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            if (messageInput.value.trim()) {
+                sendMessage(messageInput.value);
+            }
+        }
+    });
+    
+    // Additional: bring back overlay if needed? no, but for UX if user wants to change numbers we can add later
+    // For better UX, we add ability to tap on header status to reconnect (if disconnected)
+    connectionStatusSpan.addEventListener('dblclick', () => {
+        if (isConnected) {
+            if (confirm("Disconnect and change numbers?")) {
+                resetConnection();
+            }
+        } else {
+            if (setupOverlay.style.display === "none") {
+                resetConnection(); // show overlay
+            }
+        }
+    });
+    
+    // Optional: provide toast-like experience for network recovery
+    let networkAlertTimer = null;
+    window.addEventListener('online', () => {
+        if (isConnected) {
+            fetchMessagesFromSheet().catch(e=>console.log);
+            updateConnectionUI(true, "back online");
+        }
+    });
+    window.addEventListener('offline', () => {
+        if (isConnected) updateConnectionUI(false, "📡 offline");
+    });
+    
+    // Prefill sample? not needed. also check initial script url
+    // If script url not valid, show gentle console warning but not break UI.
+    console.log("SheetChat ready — Replace SCRIPT_URL with your Apps Script Web App URL");
+    
+    // Edge: support for older browsers & mobile orientation fix
+    window.addEventListener('resize', () => {
+        if (chatMessagesDiv) {
+            chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+        }
+    });
+    
+    // small fix: when keyboard opens on mobile, ensure scroll
+    messageInput.addEventListener('focus', () => {
+        setTimeout(() => {
+            if (chatMessagesDiv) chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+        }, 300);
+    });
+    
+    // initial setup: ensure if users click outside? not needed.
+    // final guard to show that fetch might fail gracefully.
+    // also for Apps Script you must deploy as "Execute as me" and allow anonymous access (or public)
+    // note: The script URL must accept POST with JSON fields: action, sender, receiver, message (for send)
+    // and action:"fetch", myNum, friendNum to retrieve conversation.
+    // The provided Google Script must return json array: [{sender:"phone", text:"hi"}]
+    // If you need different field mapping you can adapt renderMessages.
+    // Because we support flexible text field fallback.
+    
+    // user manual adjustments: if fetch returns weird structure, default to empty array.
+    // perfect for mobile compatibility & smooth animations
+</script>
+</body>
+</html>
